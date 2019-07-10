@@ -1,0 +1,115 @@
+# MaxScale documentation:
+# https://mariadb.com/kb/en/mariadb-enterprise/mariadb-maxscale-23/
+
+# Global parameters
+
+# Complete list of configuration options:
+# https://mariadb.com/kb/en/mariadb-maxscale-23-mariadb-maxscale-configuration-usage-scenarios/
+
+[maxscale]
+threads=auto
+maxlog=1
+log_warning=1
+log_notice=1
+log_info=1
+
+# Server definitions
+#
+# Set the address of the server to the network
+# address of a MariaDB server.
+
+[galera1]
+type=server
+address=10.0.2.78
+port=3306
+protocol=MariaDBBackend
+
+[galera2]
+type=server
+address=10.0.2.195
+port=3306
+protocol=MariaDBBackend
+
+[galera3]
+type=server
+address=10.0.2.176
+port=3306
+protocol=MariaDBBackend
+
+[galera3.bis]
+type=server
+address=10.0.2.176
+port=3306
+protocol=MariaDBBackend
+
+[slave1]
+type=server
+address=10.0.2.42
+port=3306
+protocol=MariaDBBackend
+
+# Monitor for the servers
+#
+# This will keep MaxScale aware of the state of the servers.
+# MariaDB Monitor documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-23-mariadb-monitor/
+
+[galera-monitor]
+type=monitor
+module=galeramon
+servers=galera1,galera2,galera3
+user=monitor
+password=monitor
+monitor_interval=500
+
+[replication-monitor]
+type=monitor
+module=mariadbmon
+servers=galera3.bis,slave1
+user=monitor
+password=monitor
+monitor_interval=500
+events=master_down
+script=/var/lib/failover.sh --initiator=$INITIATOR --children=$CHILDREN
+
+# Service definitions
+#
+# Service Definition for a read-only service and
+# a read/write splitting service.
+#
+
+# ReadWriteSplit documentation:
+# https://mariadb.com/kb/en/mariadb-maxscale-23-readwritesplit/
+
+[galerasplit]
+type=service
+router=readwritesplit
+servers=galera1,galera2,galera3,slave1
+user=maxscale
+password=maxscale
+
+# This service enables the use of the MaxAdmin interface
+# MaxScale administration guide:
+# https://mariadb.com/kb/en/mariadb-maxscale-23-maxadmin-admin-interface/
+
+[MaxAdmin-Service]
+type=service
+router=cli
+
+# Listener definitions for the services
+#
+# These listeners represent the ports the
+# services will listen on.
+#
+
+[Read-Write-Listener]
+type=listener
+service=galerasplit
+protocol=MariaDBClient
+port=4306
+
+[MaxAdmin-Listener]
+type=listener
+service=MaxAdmin-Service
+protocol=maxscaled
+socket=default
