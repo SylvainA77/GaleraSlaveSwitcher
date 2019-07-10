@@ -1,1 +1,53 @@
+Chapter 1 : Issues & goals
+Despite the coming of galera-4, embedded in MariaDB 10.4, the inconsistency of the mariaDB GTID across a galera cluster has not been solved.
+This means there is no automated way to move a slave from one galera node to another as masters. And especially Maxscale can detect failures but its failover and switchover features are rendered uselessby this behaviour.
 
+So the goal of this set of functionalities is to make Maxscale great again. Joke aside, Maxscale is an essential piece of software in any MariaDB-based HA topology.
+Which means we have to find a way to restore the failover capailities in the perspective of an hybrid topology (meaning galera nodes are masters and they have slaves).
+
+Another issue is coming from Maxscale. If one of your servers is both part of a galera cluster and a replication topology, you have to duplicate the server object since one server object can only be handled by a single monitor. Youcan check the maxscale.cnf frile you'll find a galera3 and a galera3.bis objectwhich are the same servers.
+but that's today the only way to handle such a case.
+   
+Chapter 2 : Needs & algorithm
+
+MariaDB GTID is acting as a watermark inside the binlogs. Since they cannot be used, we need another kind of watermark. Shlomi Noach did preset an excellent technique called pseudo-GTID, back in the days of MariaDB 5.5 .
+If you wanna know more about it you can read his blog postabout it there : http://code.openark.org/blog/mysql/pseudo-gtid 
+I've used it already with great success. But i mean, we're in 2019 right ? May there be another way to do it ?
+
+Galera is using a strictly ordered message systeme that gives us a consistent GTID across the cluster. That galera GTID isa two part GTID composed of a cluster uuid and a seqno.
+That seqno interests me much, since it is actually identifying in a unique manner any single transaction inside the cluster. It would be awesome if i could link a transction in the slave binlogs to a galera seqno.
+This way i would have my consistent piece of information.
+
+Hopefully Nilnandan Joshi just brought me the answer i was looking for in his own blog post. In the binlogs of any galera node, and its slaves, you can find the xid, and that xid is the seqno i am looking for !!
+You can read Nilnandan's blog post here : https://mariadb.com/resources/blog/convert-galera-node-to-async-slave-and-vice-versa-with-galera-cluster/ 
+
+Now i have my consistent piece of information, we just need to automatize the whole process so that it's as dynamic as possible. And we're gonna link it to maxscale on a second step.
+
+Given a slave ip and its new master ip, how do we proceed : 
+1. wait until the slave has fully applied the binlog from the master ( show slave status )
+2. dig into the binlogs of the slave ( show binlog events in 'filename' ) and find the last commit line. 
+    It should looks like this : binlog.000004   1569105 Xid     1       1569136 COMMIT /* xid=5333 */
+3. dig into the binlogs of the newmaster ( show binlog events in 'filename' ) and find the corresponding BEGIN & COMMIT lines. 
+    It should looks like this : binlog.000005   1568862 Gtid    1       1568904 BEGIN GTID 0-1-5303
+                                binlog.000005   1569105 Xid     1       1569136 COMMIT /* xid=5333 */
+4. equipped with the GTID, setup the slave to replicate on the new master ( set global gtid_slave_pos + change master to )
+
+For your culture, a full transaction entry in the binlogs should look like this in an RBR replication : 
+
+binlog.000004   1572993 Gtid    1       1573035 BEGIN GTID 0-1-5318
+binlog.000004   1573035 Annotate_rows   1       1573119 INSERT INTO `CountryLanguage` VALUES ('ZWE','Shona','F',72.1)
+binlog.000004   1573119 Table_map       1       1573188 table_id: 27 (world.CountryLanguage)
+binlog.000004   1573188 Write_rows_v1   1       1573237 table_id: 27 flags: STMT_END_F
+binlog.000004   1573237 Xid     1       1573268 COMMIT /* xid=5348 */
+
+Given a master_down event, and therefore the failed master ip, how do i get the ip of the next master :
+1. find the galera monitor which the failed server belongs to using its ip ( maxctrl show servers )
+2. using the galera monitor name, find the ips of the synced node ( maxctrl show servers )
+3. choose one ip
+
+Chapter 3 : limitations
+
+1. DDL are not handled yet
+2. script only handles 1 slave
+3. internal errorw handling is not yet ready
+4. internal logging is not yet ready
