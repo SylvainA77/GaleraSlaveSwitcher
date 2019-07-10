@@ -36,6 +36,8 @@ address=10.0.2.176
 port=3306
 protocol=MariaDBBackend
 
+# here we can see the duplication of the server objects
+# it is forced by the way maxscale monitor handles the server objects
 [galera3.bis]
 type=server
 address=10.0.2.176
@@ -69,6 +71,7 @@ servers=galera3.bis,slave1
 user=monitor
 password=monitor
 monitor_interval=500
+# that's where everything happens. upon master down detection, the script is triggered with the necessary parameters
 events=master_down
 script=/var/lib/failover.sh --initiator=$INITIATOR --children=$CHILDREN
 
