@@ -66,4 +66,17 @@ switchover()
 return $retcode
 }
 
+findnewmaster()
+{
+        [ $# -ne 1 ] && echo "findnewmaster function requires only 1 arg : slave ip" && exit -4
+
+        #1.2 find which galeramonitor master was part of
+        monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address  -e ^State -e ^Monitors | grep -C2 $1 | grep -A1 Synced  | tail -1 | cut -f2 )
+
+        #1.3 find on other synced node in the same monitor
+        newmasteraddress=$( maxctrl --tsv show servers | grep -e ^Address  -e ^State -e ^Monitors | grep -B3 $monitor | grep -B1 Synced | head -1 |cut -f2 )
+
+        return $newmasteraddress
+}
+
 exit 0
