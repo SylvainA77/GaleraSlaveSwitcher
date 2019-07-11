@@ -56,3 +56,6 @@ Chapter 3 : limitations
 Chapter 4 : pseudoGTID
 
 In order to illustrate my primary work on the subject, i uploaded the sources of the pseudoGTID implementation i did in 2016. These sources are only here for demonstration only, and to keep track of history of the functionality in my mind.  DISCLAIMER : JUST. DO. NOT. USE. THIS. PART. IN. PRODUCTION. EVER. or do it and don't come back crying.
+
+Chapter 5 : prerequisites
+mainly devloped for centos/RHEL, it should be ok whenever you can run gnu bash.
