@@ -7,7 +7,10 @@
 #  exec 1>/var/log/switchover.log
   exec 2>/var/log/switchover.err
 
+#set -x
+
 debug=1
+
 
 echoerr()
 {
@@ -23,12 +26,20 @@ sqlexec()
 }
 
 switchover()
-        [ $# -ne 4 ] && echo "Switchover fucnction requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
+{
+
+        [[ -n "$debug" ]] && echoerr "switchover args : $*"
+        [ $# -ne 4 ] && echo "Switchover function requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
 
         mastercredentials="-u$3 -p$4 -h$2"
+        [[ -n "$debug" ]] && echoerr "master credentials : $mastercredentials"
+
         slavecredentials="-u$3 -p$4 -h$1"
+        [[ -n "$debug" ]] && echoerr "slavecredentials : $slavecredentials"
 
         #1 wait until slave is fully up to date
+        [[ -n "$debug" ]] && echoerr "wait until slave up to date"
+
         while [ $readlogpos -ne $execlogpos ]
         do
                 read readlogpos execlogpos <<<$( sqlexec $slavecredentials "show slave status" | cut -f7,22 )
@@ -37,36 +48,61 @@ switchover()
 
         #2   find the watermark on the slave
         #2.1 find the last binlog file
+        [[ -n "$debug" ]] && echoerr "find last binlog on slave"
+
         slavelastbinlogfile=$( sqlexec $slavecredentials 'show master status' | cut -f1 )
+        [[ -n "$debug" ]] && echoerr "slavelastbinlogfile : $slavelastbinlogfile "
 
         #2.2 find the watermark (xid) on the last binlog entry
-        watermark=$( sqlexec $slavecredentials "show binlog events in '$binlogfile'" | grep -i commit | tail -1 | cut -f6 | cut -d'*' -f2 | xargs )
+        [[ -n "$debug" ]] && echoerr "find watermark in binlogfile"
+        #stmt="show binlog events in'"
+        #stmt+="$"
+        #stmt+="'"
+        watermark=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile'" | grep -i commit | tail -1 | cut -f6 | cut -d'*' -f2 | xargs )
+        [[ -n "$debug" ]] && echoerr "watermark : $watermark "
 
         #3   find the watermark on the new master
         #3.1 find the list of binlog files in reverse order
-        newmasterbinlogfiles =( $( sqlexec $mastercredentials 'show binary logs' | cut -f1 | tac ) )
+        [[ -n "$debug" ]] && echoerr "find list of binlog files (reverse order) on new master"
+
+        readarray -t newmasterbinlogfiles <<< $( sqlexec $mastercredentials 'show binary logs' | cut -f1 | tac )
+        [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles : $newmasterbinlogfiles"
+
+        [[ -n "$debug" ]] && echoerr "parse each binlog file  until xwatermakr is find"
 
         for eachbinlogfile in "${newmasterbinlogfiles[@]}"
         do
+                [[ -n "$debug" ]] && echoerr "eachbinlogfile : $eachbinlogfile"
+                # we search for watermark in actual binlogfile
+
                 watermarkGTID=$( sqlexec $mastercredentials "show binlog events in '$eachbinlogfile'" | grep -i -e commit -e begin | grep -i -e "$watermark" -B1 | head -1 | cut -f6 | cut -d' ' -f3)
+                [[ -n "$debug" ]] && echoerr "watermarkGTID : $watermarkGTID"
+
                 [[ ! -z "$watermarkGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
         done
+        
+        [[ -n "$debug" ]] && echoerr "watermark gtid match is found $watermarkGTID"
 
         #4 change slave settings and reconnect
         #4.1 stop slave
+        [[ -n "$debug" ]] && echoerr "stop slave"
         sqlexec $slavecredentials 'stop slave'
 
         #4.2 change slave gtid
-        sqlexec $slavecredentials "set global gtid_slave_pos=$watermakrGTID"
-        
+        [[ -n "$debug" ]] && echoerr "set gtid"
+        sqlexec $slavecredentials 'set global gtid_slave_pos=$watermakrGTID'
+
         #4.3 change master shot
-        sqlexec $slavecredentials "change master to master_host=$newmasterip, master_use_gtid=slave_pos"
+        [[ -n "$debug" ]] && echoerr "change master"
+        sqlexec $slavecredentials 'change master to master_host=$newmasterip, master_use_gtid=slave_pos'
 
         #4.4 start slave
+        [[ -n "$debug" ]] && echoerr "start slave"
         sqlexec $slavecredentials 'start slave'
 
 return $retcode
 }
+
 
 findnewmaster()
 {
@@ -89,3 +125,4 @@ findnewmaster()
         echo "$myresult"
 
         return 0
+}
