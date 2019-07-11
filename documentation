@@ -51,3 +51,7 @@ Chapter 3 : limitations
 
 3. internal errorw handling is not yet ready
 4. internal logging is not yet ready
+
+Chapter 4 : pseudoGTID
+
+in order to illustrate my primary work on the subject, i uploaded the sources of the pseudoGTID implementation i did in 2016. These sources are only here for demonstration only, and to keep track of history of the functionality in my mind.  DISCLAIMER : JUST. DO. NOT. USE. THIS. PART. IN. PRODUCTION. EVER. or do it and don't come back crying.
