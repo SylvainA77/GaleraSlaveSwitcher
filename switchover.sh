@@ -4,8 +4,15 @@
 # needs : 1. slave ip,
 #         2. new master ip,
 #         3. user with replication client on both slave & whole cluster : maxscale monitor user is a good fit
-  exec 1>/var/log/switchover.log
+#  exec 1>/var/log/switchover.log
   exec 2>/var/log/switchover.err
+
+debug=1
+
+echoerr()
+{
+        echo "`date +%F:%T`:$@" 1>&2;
+}
 
 sqlexec()
 {
@@ -61,15 +68,22 @@ return $retcode
 
 findnewmaster()
 {
-        [ $# -ne 1 ] && echo "findnewmaster function requires only 1 arg : slave ip" && exit -3
+        [[ -n "$debug" ]] && echoerr "findnewmaster args : $*"
+        [ $# -ne 1 ] && echoerr "findnewmaster function requires 1 arg : slave ip " && exit -4
+
+        [[ -n "$debug" ]] && echoerr "find galera monitor of failed master"
 
         #1.2 find which galeramonitor master was part of
-        monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address  -e ^State -e ^Monitors | grep -C2 $1 | grep -A1 Synced  | tail -1 | cut -f2 )
+        monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address  -e ^State -e ^Monitors | grep -C2 $1 | grep -A1 Synced  | tail -1 | cut -f2 | xargs )
+        [[ -n "$debug" ]] && echoerr "monitor : $monitor "
+
+        [[ -n "$debug" ]] && echoerr "find 1st synced member of same monitor group"
 
         #1.3 find on other synced node in the same monitor
-        newmasteraddress=$( maxctrl --tsv show servers | grep -e ^Address  -e ^State -e ^Monitors | grep -B3 $monitor | grep -B1 Synced | head -1 |cut -f2 )
 
-        return $newmasteraddress
-}
+        local myresult=$( maxctrl --tsv show servers | grep -e ^Address  -e ^State -e ^Monitors | grep -B3 "$monitor" | grep -B1 Synced | head -1 |cut -f2 | xargs )
+        [[ -n "$debug" ]] && echoerr "newmasteraddress : $myresult"
 
-exit 0
+        echo "$myresult"
+
+        return 0
