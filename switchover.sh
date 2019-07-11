@@ -31,7 +31,8 @@ switchover()
         #1 wait until slave is fully up to date
         while [ $readlogpos -ne $execlogpos ]
         do
-                read readlogpos execlogpos <<<$( sqlexec $slavecredentials 'show slave status' | cut -f7,22 )
+                read readlogpos execlogpos <<<$( sqlexec $slavecredentials "show slave status" | cut -f7,22 )
+                [[ -n "$debug" ]] && echoerr "readlogpos : $readlogpos / execlogpos : $execlogpos "
         done
 
         #2   find the watermark on the slave
