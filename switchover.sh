@@ -16,9 +16,10 @@ echoerr()
 
 sqlexec()
 {
-        [ $# -ne 2 ] && echo "sqlexec function requires 2 args : 1. credentials, 2. sql statement to execute" && exit -2
-        mysql -B --skip_column_names $1 -e $2
-        exit $?
+       [[ -n "$debug" ]] && echoerr "sqlexec args : $*"
+       [[ -n "$debug" ]] && echoerr "$1 $2 $3 -e $4"
+       echo "$4" | mysql -B --skip_column_names $1 $2 $3
+       [ $? -ne 0 ] && exit $?
 }
 
 switchover()
