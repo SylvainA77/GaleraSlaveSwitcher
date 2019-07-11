@@ -14,13 +14,6 @@ sqlexec()
         exit $?
 }
 
-maxexec()
-{
-        [ $# -ne 1 ] && echo "maxexec function requires only 1 args : 1. maxscale request to execute" && exit -3
-        maxctrl --tsv $1
-        exit $?
-}
-
 switchover()
         [ $# -ne 4 ] && echo "Switchover fucnction requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
 
@@ -68,7 +61,7 @@ return $retcode
 
 findnewmaster()
 {
-        [ $# -ne 1 ] && echo "findnewmaster function requires only 1 arg : slave ip" && exit -4
+        [ $# -ne 1 ] && echo "findnewmaster function requires only 1 arg : slave ip" && exit -3
 
         #1.2 find which galeramonitor master was part of
         monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address  -e ^State -e ^Monitors | grep -C2 $1 | grep -A1 Synced  | tail -1 | cut -f2 )
