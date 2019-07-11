@@ -2,15 +2,15 @@ Chapter 1 : Issues & goals
 Despite the coming of galera-4, embedded in MariaDB 10.4, the inconsistency of the mariaDB GTID across a galera cluster has not been solved.
 This means there is no automated way to move a slave from one galera node to another as masters. And especially Maxscale can detect failures but its failover and switchover features are rendered uselessby this behaviour.
 
+Another issue is coming from Maxscale. If one of your servers is both part of a galera cluster and a replication topology, you have to duplicate the server object since one server object can only be handled by a single monitor. Youcan check the maxscale.cnf frile you'll find a galera3 and a galera3.bis objectwhich are the same servers.
+but that's today the only way to handle such a case.
+
 So the goal of this set of functionalities is to make Maxscale great again. Joke aside, Maxscale is an essential piece of software in any MariaDB-based HA topology.
 Which means we have to find a way to restore the failover capailities in the perspective of an hybrid topology (meaning galera nodes are masters and they have slaves).
 
-Another issue is coming from Maxscale. If one of your servers is both part of a galera cluster and a replication topology, you have to duplicate the server object since one server object can only be handled by a single monitor. Youcan check the maxscale.cnf frile you'll find a galera3 and a galera3.bis objectwhich are the same servers.
-but that's today the only way to handle such a case.
-   
-Chapter 2 : Needs & algorithm
+Chapter 2 : Needs & algorithms
 
-MariaDB GTID is acting as a watermark inside the binlogs. Since they cannot be used, we need another kind of watermark. Shlomi Noach did preset an excellent technique called pseudo-GTID, back in the days of MariaDB 5.5 .
+MariaDB GTID is acting as a regular watermark inside the binlogs. Since they cannot be used, we need another kind of watermark. Shlomi Noach did preset an excellent technique called pseudo-GTID, back in the days of MariaDB 5.5 .
 If you wanna know more about it you can read his blog postabout it there : http://code.openark.org/blog/mysql/pseudo-gtid 
 I've used it already with great success. But i mean, we're in 2019 right ? May there be another way to do it ?
 
