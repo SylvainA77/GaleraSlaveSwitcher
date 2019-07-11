@@ -1,13 +1,43 @@
 #!/bin/bash
+###
 # switchover.sh
-# just a function lib
-# needs : 1. slave ip,
-#         2. new master ip,
-#         3. user with replication client on both slave & whole cluster : maxscale monitor user is a good fit
-#  exec 1>/var/log/switchover.log
-  exec 2>/var/log/switchover.err
+# just a function lib to source in your own bash if you need
+###
+#              |||
+# +------ooOO-(O O)-OOoo------+
+# |            (_)            |
+# |     Sylvain  Arbaudie     |
+# |   arbaudie.it@gmail.com   |
+# +---------------------------+
+###
+# original code & doc by Sylvain Arbaudie 
+# github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
+###
+# functions desc
+#
+# echoerr
+# desc : sends all the debugs to stderr and adds a timestamp
+# args : 1. string to log
+#
+# sqlexec
+# desc : execute sql commands to the server you want, output formatted in a bash frield way
+# args : 1. credentials [ -uuser -ppassword -hhost ]
+#        2. sql statement
+#
+# switchover
+# desc : switch the designated slave to the designated new master
+# args : 1. slave ip
+#        2. master ip
+#        3. user
+#        4. password
+#
+# findnewmaster
+# desc : given a slave ip, finds a suitable new mlaster among the synced node of the galera cluster
+# args : 1. slave ip
+###
 
-#set -x
+# forward stderr to /var/log/switchover.err
+exec 2>/var/log/switchover.err
 
 debug=1
 
@@ -126,3 +156,4 @@ findnewmaster()
 
         return 0
 }
+
