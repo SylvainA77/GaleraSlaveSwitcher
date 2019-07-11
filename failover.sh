@@ -5,6 +5,7 @@
   exec 1>/var/log/failover.log
   exec 2>/var/log/failover.err
 
+# we need all those juicy functions don't we ?
 source ./switchover.sh
 
 ARGS=$(getopt -o '' --long 'initiator:,children:' -- "$@")
@@ -32,7 +33,16 @@ done
 
 #1   find the new master
         masterterip=$( findnewmaster $initiator )
-#2   find the watermark on each children
-        switchover $children $masterip monitor monitor
+#2   perform the switchover on every oprhaned child
 
+        # format of $children is : [IP]:port,[IP]:port,*
+        # so we have to break the string into an array of strings using , as a separator
+        IFS=',' read -ra childrens <<< "$children"
+        for child in `${children[@]}`
+        do
+                # format of $child is still [IP]:port
+                # so we have to extract the ip using both brackets as separators
+                thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
+                switchover $thischild $masterip monitor monitor
+        done
 exit $?
