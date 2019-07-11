@@ -25,8 +25,8 @@ sqlexec()
 switchover()
         [ $# -ne 4 ] && echo "Switchover fucnction requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
 
-        mastercredentials="-u$3 -p$4 -h $2"
-        slavecredentials="-u$3 -p$4 -h $1"
+        mastercredentials="-u$3 -p$4 -h$2"
+        slavecredentials="-u$3 -p$4 -h$1"
 
         #1 wait until slave is fully up to date
         while [ $readlogpos -ne $execlogpos ]
