@@ -48,6 +48,6 @@ Given a master_down event, and therefore the failed master ip, how do i get the 
 Chapter 3 : limitations
 
 1. DDL are not handled yet
-2. script only handles 1 slave
+
 3. internal errorw handling is not yet ready
 4. internal logging is not yet ready
