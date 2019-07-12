@@ -83,14 +83,17 @@ switchover()
         slavelastbinlogfile=$( sqlexec $slavecredentials 'show master status' | cut -f1 )
         [[ -n "$debug" ]] && echoerr "slavelastbinlogfile : $slavelastbinlogfile "
 
-        #2.2 find the watermark (xid) on the last binlog entry
+        #2.2 find the watermark (xid) on the last trx in the binlogs and position for DDL offset count
         [[ -n "$debug" ]] && echoerr "find watermark in binlogfile"
-        #stmt="show binlog events in'"
-        #stmt+="$"
-        #stmt+="'"
         watermark=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile'" | grep -i commit | tail -1 | cut -f6 | cut -d'*' -f2 | xargs )
+        # read endlogpos watermark=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile'" | grep -i commit | tail -1 | cut -f5,6 | xargs )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark "
-
+        # [[ -n "$debug" ]] && echoerr "endlogpos : $endlogpos "        
+        
+        #2.3 find wether there are any replicated DDL after the last committed trx, store how many in offset variable as in counting the number of gtid entrys after the watermak position
+        # DDLoffset=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile' from $endlogpos" |grep -i -gitd | wc -l )
+        #[[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset "
+        
         #3   find the watermark on the new master
         #3.1 find the list of binlog files in reverse order
         [[ -n "$debug" ]] && echoerr "find list of binlog files (reverse order) on new master"
