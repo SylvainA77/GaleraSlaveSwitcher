@@ -1,6 +1,7 @@
 test & debug
-add DDL management
-add error handling
-add logging handling
-add hash check
-add sport support in sqlexec
+DDL management
+error handling
+logging handling
+hash check
+port support in sqlexec
+code refactoring in switchover lib
