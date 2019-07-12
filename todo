@@ -1,7 +1,7 @@
 test & debug
-DDL management
+DDL management : done
 error handling
-logging handling
+logging handling : done
 hash check
 port support in sqlexec
-code refactoring in switchover lib
+code refactoring in switchover lib : done
