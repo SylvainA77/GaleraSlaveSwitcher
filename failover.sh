@@ -1,5 +1,6 @@
 #!/bin/bash
 # failover.sh
+# failover.sh
 ###
 #              |||
 # +------ooOO-(O O)-OOoo------+
@@ -8,7 +9,7 @@
 # |   arbaudie.it@gmail.com   |
 # +---------------------------+
 ###
-# original code & doc by Sylvain Arbaudie 
+# original code & doc by Sylvain Arbaudie
 # github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
 ###
 # this bash script is intended to be triggered by maxscale event API
@@ -18,11 +19,12 @@
 # logs are sent to /var/log/failover.log
 # stderr is sent to failover.err
 
-  exec 1>/var/log/failover.log
-  exec 2>/var/log/failover.err
+
+exec 2>/var/log/failover.err
 
 # we need all those juicy functions don't we ?
-source ./switchover.sh
+source /var/lib/switchover.lib
+source /etc/.credentials
 
 ARGS=$(getopt -o '' --long 'initiator:,children:' -- "$@")
 
@@ -47,18 +49,32 @@ while true; do
     esac
 done
 
-#1   find the new master
-        masterterip=$( findnewmaster $initiator )
-#2   perform the switchover on every oprhaned child
+#1 stopping slave to try and preserve relaylogs
 
-        # format of $children is : [IP]:port,[IP]:port,*
-        # so we have to break the string into an array of strings using , as a separator
-        IFS=',' read -ra childrens <<< "$children"
-        for child in `${children[@]}`
-        do
-                # format of $child is still [IP]:port
-                # so we have to extract the ip using both brackets as separators
-                thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
-                switchover $thischild $masterip monitor monitor
-        done
+# format of $children is : [IP]:port,[IP]:port,*
+# so we have to break the string into an array of strings using , as a separator
+IFS=',' read -ra childrens <<< "$children"
+for child in `${children[@]}`
+do
+        thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
+        slavecredentials+=$thischlid
+        sqlexec $slavecredentials "stop slave"
+done
+
+#2   find the new master
+masterterip=$( findnewmaster $initiator )
+
+#3   perform the switchover on every oprhaned child
+
+# format of $children is : [IP]:port,[IP]:port,*
+# so we have to break the string into an array of strings using , as a separator
+IFS=',' read -ra childrens <<< "$children"
+for child in `${children[@]}`
+do
+        # format of $child is still [IP]:port
+        # so we have to extract the ip using both brackets as separators
+        thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
+        switchover $thischild $masterip
+done
+
 exit $?
