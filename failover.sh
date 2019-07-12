@@ -57,8 +57,8 @@ IFS=',' read -ra childrens <<< "$children"
 for child in `${children[@]}`
 do
         thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
-        slavecredentials+=$thischlid
-        sqlexec $slavecredentials "stop slave"
+        $thischlid
+        sqlexec $thishcild "stop slave"
 done
 
 #2   find the new master
