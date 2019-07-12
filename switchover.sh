@@ -13,7 +13,7 @@
 # original code & doc by Sylvain Arbaudie 
 # github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
 ###
-# functions desc
+# functions description
 #
 # echoerr
 # desc : sends all the debugs to stderr and adds a timestamp
