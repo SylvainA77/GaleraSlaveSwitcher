@@ -10,7 +10,7 @@
 # |   arbaudie.it@gmail.com   |
 # +---------------------------+
 ###
-# original code & doc by Sylvain Arbaudie 
+# original code & doc by Sylvain Arbaudie
 # github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
 ###
 # functions description
@@ -21,53 +21,39 @@
 #
 # sqlexec
 # desc : execute sql commands to the server you want, output formatted in a bash frield way
-# args : 1. credentials [ -uuser -ppassword -hhost ]
+# args : 1. host/ip
 #        2. sql statement
 #
 # switchover
 # desc : switch the designated slave to the designated new master
-# args : 1. slave ip
-#        2. master ip
-#        3. user
-#        4. password
+# args : 1. slave host/ip
+#        2. master host/ip
 #
 # findnewmaster
 # desc : given a slave ip, finds a suitable new mlaster among the synced node of the galera cluster
-# args : 1. slave ip
+# args : 1. slave host/ip
 #
-# waitforslaveuptodate
+# waitforslave
 # desc : given credentials, connect to the machine and wait until slave is up to date (as in : read binlogs = exec binlogs)
-# args : 1. credentials [ -uuser -ppassword -hhost ]
+# args : 1. slave host/ip
 #
 # getslavewatermark
 # desc : given credentials, connect to the machine, get watermark and DDLoffset
-# args : 1. credentials [ -uuser -ppassword -hhost ]
+# args : 1. slave host/ip
 #
 # getmasterGTID
 # desc : given credentials, watermark, and offset, get the correspondiong GTID
-# args : 1. credentials [ -uuser -ppassword -hhost ]
+# args : 1. master host/ip
 #        2. watermark
-#        3. offset 
-#
-# attachslavetomaster
-# desc : given credentials, GTID and ip, uses the credentials to change the slave settings and replicate it from ip
-# args : 1. credentials  [ -uuser -ppassword -hhost ]
-#        2. GTID
-#        3. ip
-#
-# getcredentials
-# desc : given a logiun, pâsword and host, creates a credential string
-# args : 1. login
-#        2. password
-#        3. host
+#        3. offset
 #
 ###
 
-# forward stderr to /var/log/switchover.err
 exec 2>/var/log/switchover.err
 
-debug=1
+source ./.credentials
 
+debug=1
 
 echoerr()
 {
@@ -77,126 +63,116 @@ echoerr()
 sqlexec()
 {
        [[ -n "$debug" ]] && echoerr "sqlexec args : $*"
-       echo "$4" | mysql -B --skip_column_names $1 $2 $3
+       [ $# -ne 2 ] && echo "sqlexec function requires 2 args : ip, statement " && exit -1
+
+       local credentials=$( getcredentials $1 )
+       [[ -n "$debug" ]] && echoerr "credentials : $credentials"
+       echo "$2" | mysql -B --skip_column_names $credentials
        [ $? -ne 0 ] && exit $?
 }
 
-waitforslaveuptodate()
+waitforslave()
 {
-# TODO :if show slave status empty : return error
-       [[ -n "$debug" ]] && echoerr "waitforslaveuptodate args : $*"
+
+        [[ -n "$debug" ]] && echoerr "waitforslave args : $*"
+        [ $# -ne 1 ] && echo "waitforslave function requires 1 arg : slave ip" && exit -1
+
+        local slave$1
+
         while [ $readlogpos -ne $execlogpos ]
         do
-                read readlogpos execlogpos <<<$( sqlexec $1 "show slave status" | cut -f7,22 )
+                read readlogpos execlogpos <<<$( sqlexec $slave "show slave status" | cut -f7,22 )
                 [[ -n "$debug" ]] && echoerr "readlogpos : $readlogpos / execlogpos : $execlogpos "
         done
-        
-        return 0
 }
 
 getslavewatermark()
 {
-#TODO
 
+        [[ -n "$debug" ]] && echoerr "getslavwatermark args : $*"
+        [ $# -ne 1 ] && echo "getslavewatermark function requires 1 arg : slave ip" && exit -1
+
+        local slave=$1
+        #ALGO : lastslavegtid, xid + offset depuis le relaylog
+        [[ -n "$debug" ]] && echoerr "find last relaylog file name"
+        relay_log_file=$( sqlexec $slave "show slave status" | cut -f8 )
+        [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog"
+        read endlogpos watermark=$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f5,6 | xargs )
+        DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
+        watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
+        [[ -n "$debug" ]] && echoerr "watermark : $watermark"
+        [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
+
+        echo "$watermark\t$DDLoffset"
 }
 
-getmasterGTID()
+getmasterGTIDfromwatermark()
 {
-#TODO
 
-}
+        [[ -n "$debug" ]] && echoerr "getmasterGTIDfromwatermark args : $*"
+        [ $# -ne 3 ] && echo "getimasterGTIFfromwatermark function requires 3 args : master ip, watermark ert DDLoffset " && exit -1
+        local master=$1
+        local watermark=$2
+        local offset=$3
+        local masterGTID=""
 
-attachslavetomaster()
-{
-#TODO
+        [[ -n "$debug" ]] && echoerr "find list of binlog files (reverseorder) on new master"
 
-}
+        newmasterbinlogfiles=( $( sqlexec $master 'show binary logs' | cut -f1 | tac ) )
+        [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles : ${newmasterbinlogfiles[@]}"
+        [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles number : ${#newmasterbinlogfiles[@]}"
+        [[ -n "$debug" ]] && echoerr "parse each binlog file until watermakr "
 
-getcredentials()
-{
-#TODO
+        for eachbinlogfile in "${newmasterbinlogfiles[@]}"
+        do
+                [[ -n "$debug" ]] && echoerr "eachbinlogfile :$eachbinlogfile"
+                # we search for watermark in actual binlogfile
+
+                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | tail -1 | cut -f6 | cut -d' ' -f2 )
+                [[ -n "$debug" ]] && echoerr "masterGTID : $masterGTID"
+
+                [[ ! -z "$masterGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
+        done
+
+        echo "$masterGTID"
 }
 
 switchover()
 {
+
         [[ -n "$debug" ]] && echoerr "switchover args : $*"
-        [ $# -ne 4 ] && echo "Switchover function requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
+        [ $# -ne 2 ] && echo "Switchover function requires 2 args : 1. slave ip, 2. new master ip" && exit -1
+        local slave=$1
+        local master=$2
 
-        mastercredentials="-u$3 -p$4 -h$2"
-        [[ -n "$debug" ]] && echoerr "master credentials : $mastercredentials"
+        #1   find the watermark on the slave
+        [[ -n "$debug" ]] && echoerr "find watermark in relaylogfile"
 
-        slavecredentials="-u$3 -p$4 -h$1"
-        [[ -n "$debug" ]] && echoerr "slavecredentials : $slavecredentials"
+        watermark DDLoffset <<<$( getslavewatermark $slave )
 
-        #1 wait until slave is fully up to date
-        [[ -n "$debug" ]] && echoerr "wait until slave up to date"
+        #2   find the watermark on the new master
 
-        while [ $readlogpos -ne $execlogpos ]
-        do
-                read readlogpos execlogpos <<<$( sqlexec $slavecredentials "show slave status" | cut -f7,22 )
-                [[ -n "$debug" ]] && echoerr "readlogpos : $readlogpos / execlogpos : $execlogpos "
-        done
-
-        #2   find the watermark on the slave
-        #2.1 find the last binlog file
-        [[ -n "$debug" ]] && echoerr "find last binlog on slave"
-
-        slavelastbinlogfile=$( sqlexec $slavecredentials 'show master status' | cut -f1 )
-        [[ -n "$debug" ]] && echoerr "slavelastbinlogfile : $slavelastbinlogfile "
-
-        #2.2 find the watermark (xid) on the last trx in the binlogs and position for DDL offset count
-        [[ -n "$debug" ]] && echoerr "find watermark in binlogfile"
-        watermark=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile'" | grep -i commit | tail -1 | cut -f6 | cut -d'*' -f2 | xargs )
-        # read endlogpos watermark=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile'" | grep -i commit | tail -1 | cut -f5,6 | xargs )
-        [[ -n "$debug" ]] && echoerr "watermark : $watermark "
-        # [[ -n "$debug" ]] && echoerr "endlogpos : $endlogpos "        
-        
-        #2.3 find wether there are any replicated DDL after the last committed trx, store how many in offset variable as in counting the number of gtid entrys after the watermak position
-        # DDLoffset=$( sqlexec $slavecredentials "show binlog events in '$slavelastbinlogfile' from $endlogpos" |grep -i -gitd | wc -l )
-        #[[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset "
-        
-        #3   find the watermark on the new master
-        #3.1 find the list of binlog files in reverse order
-        [[ -n "$debug" ]] && echoerr "find list of binlog files (reverse order) on new master"
-
-        readarray -t newmasterbinlogfiles <<< $( sqlexec $mastercredentials 'show binary logs' | cut -f1 | tac )
-        [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles : $newmasterbinlogfiles"
-
-        [[ -n "$debug" ]] && echoerr "parse each binlog file  until xwatermakr is find"
-
-        for eachbinlogfile in "${newmasterbinlogfiles[@]}"
-        do
-                [[ -n "$debug" ]] && echoerr "eachbinlogfile : $eachbinlogfile"
-                # we search for watermark in actual binlogfile
-
-                watermarkGTID=$( sqlexec $mastercredentials "show binlog events in '$eachbinlogfile'" | grep -i -e commit -e begin | grep -i -e "$watermark" -B1 | head -1 | cut -f6 | cut -d' ' -f3)
-                [[ -n "$debug" ]] && echoerr "watermarkGTID : $watermarkGTID"
-
-                [[ ! -z "$watermarkGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
-        done
-        
-        [[ -n "$debug" ]] && echoerr "watermark gtid match is found $watermarkGTID"
+        masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
 
         #4 change slave settings and reconnect
         #4.1 stop slave
         [[ -n "$debug" ]] && echoerr "stop slave"
-        sqlexec $slavecredentials 'stop slave'
+        sqlexec $slave 'stop slave'
 
         #4.2 change slave gtid
-        [[ -n "$debug" ]] && echoerr "set gtid"
-        sqlexec $slavecredentials 'set global gtid_slave_pos=$watermakrGTID'
+        [[ -n "$debug" ]] && echoerr "set gtid to $masterGTID"
+        sqlexec $slave "set global gtid_slave_pos=$masterGTID"
 
         #4.3 change master shot
         [[ -n "$debug" ]] && echoerr "change master"
-        sqlexec $slavecredentials 'change master to master_host=$newmasterip, master_use_gtid=slave_pos'
+        sqlexec $slave 'change master to master_host=$newmasterip, master_use_gtid=slave_pos'
 
         #4.4 start slave
         [[ -n "$debug" ]] && echoerr "start slave"
-        sqlexec $slavecredentials 'start slave'
+        sqlexec $slave 'start slave'
 
 return $retcode
 }
-
 
 findnewmaster()
 {
@@ -220,4 +196,3 @@ findnewmaster()
 
         return 0
 }
-
