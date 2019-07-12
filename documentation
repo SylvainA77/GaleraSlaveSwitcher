@@ -74,3 +74,5 @@ Mainly devlopped for centos/RHEL, it should be ok whenever you can run gnu bash 
 login password w/ replciation slave & replicationb client on all servers
 mariadb / mysql client
 maxscale 
+relay_log_purge=0 + crontab to flush & purge the relay logs every now & then this way we are sure the content of relay log stays available
+
