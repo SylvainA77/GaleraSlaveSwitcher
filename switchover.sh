@@ -34,6 +34,33 @@
 # findnewmaster
 # desc : given a slave ip, finds a suitable new mlaster among the synced node of the galera cluster
 # args : 1. slave ip
+#
+# waitforslaveuptodate
+# desc : given credentials, connect to the machine and wait until slave is up to date (as in : read binlogs = exec binlogs)
+# args : 1. credentials [ -uuser -ppassword -hhost ]
+#
+# getslavewatermark
+# desc : given credentials, connect to the machine, get watermark and DDLoffset
+# args : 1. credentials [ -uuser -ppassword -hhost ]
+#
+# getmasterGTID
+# desc : given credentials, watermark, and offset, get the correspondiong GTID
+# args : 1. credentials [ -uuser -ppassword -hhost ]
+#        2. watermark
+#        3. offset 
+#
+# attachslavetomaster
+# desc : given credentials, GTID and ip, uses the credentials to change the slave settings and replicate it from ip
+# args : 1. credentials  [ -uuser -ppassword -hhost ]
+#        2. GTID
+#        3. ip
+#
+# getcredentials
+# desc : given a logiun, pâsword and host, creates a credential string
+# args : 1. login
+#        2. password
+#        3. host
+#
 ###
 
 # forward stderr to /var/log/switchover.err
@@ -50,14 +77,48 @@ echoerr()
 sqlexec()
 {
        [[ -n "$debug" ]] && echoerr "sqlexec args : $*"
-       [[ -n "$debug" ]] && echoerr "$1 $2 $3 -e $4"
        echo "$4" | mysql -B --skip_column_names $1 $2 $3
        [ $? -ne 0 ] && exit $?
 }
 
+waitforslaveuptodate()
+{
+# TODO :if show slave status empty : return error
+       [[ -n "$debug" ]] && echoerr "waitforslaveuptodate args : $*"
+        while [ $readlogpos -ne $execlogpos ]
+        do
+                read readlogpos execlogpos <<<$( sqlexec $1 "show slave status" | cut -f7,22 )
+                [[ -n "$debug" ]] && echoerr "readlogpos : $readlogpos / execlogpos : $execlogpos "
+        done
+        
+        return 0
+}
+
+getslavewatermark()
+{
+#TODO
+
+}
+
+getmasterGTID()
+{
+#TODO
+
+}
+
+attachslavetomaster()
+{
+#TODO
+
+}
+
+getcredentials()
+{
+#TODO
+}
+
 switchover()
 {
-
         [[ -n "$debug" ]] && echoerr "switchover args : $*"
         [ $# -ne 4 ] && echo "Switchover function requires 4 args : 1. slave ip, 2. new master ip, 3. user, 4. password" && exit -1
 
