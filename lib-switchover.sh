@@ -97,7 +97,7 @@ getslavewatermark()
         [[ -n "$debug" ]] && echoerr "find last relaylog file name"
         relay_log_file=$( sqlexec $slave "show slave status" | cut -f8 )
         [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog"
-        read endlogpos watermark=$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f5,6 | xargs )
+        read endlogpos watermark<<<$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f5,6 | xargs )
         DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
         watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
