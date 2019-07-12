@@ -1,3 +1,10 @@
+              |||
+ +------ooOO-(O O)-OOoo------+
+ |            (_)            |
+ |     Sylvain  Arbaudie     |
+ |   arbaudie.it@gmail.com   |
+ +---------------------------+
+
 Chapter 1 : Issues & goals
 
 Despite the coming of galera-4, embedded in MariaDB 10.4, the inconsistency of the mariaDB GTID across a galera cluster has not been solved.
@@ -59,5 +66,7 @@ In order to illustrate my primary work on the subject, i uploaded the sources of
 
 Chapter 5 : prerequisites
 
-Mainly devlopped for centos/RHEL, it should be ok whenever you can run gnu bash.
+Mainly devlopped for centos/RHEL, it should be ok whenever you can run gnu bash tho
 login password w/ replciation slave & replicationb client on all servers
+mariadb / mysql client
+maxscale 
