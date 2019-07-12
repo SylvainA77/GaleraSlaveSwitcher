@@ -1,7 +1,23 @@
 #!/bin/bash
 # failover.sh
-# wrapper script to repmgr
-# needs : slave ip, user with replication client on both slave & whole cluster : maxscale monitor user is a good fiit.
+###
+#              |||
+# +------ooOO-(O O)-OOoo------+
+# |            (_)            |
+# |     Sylvain  Arbaudie     |
+# |   arbaudie.it@gmail.com   |
+# +---------------------------+
+###
+# original code & doc by Sylvain Arbaudie 
+# github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
+###
+# this bash script is intended to be triggered by maxscale event API
+# hence only 2 args are exepected : failed master ip --initiator=$INITIATOR
+# and list of slaves to switchover --children=$CHILDREN$
+###
+# logs are sent to /var/log/failover.log
+# stderr is sent to failover.err
+
   exec 1>/var/log/failover.log
   exec 2>/var/log/failover.err
 
