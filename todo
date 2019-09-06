@@ -1,7 +1,10 @@
-test & debug
+test & debug : partly done
 DDL management : done
-error handling
+error handling : todo
 logging handling : done
-hash check
-port support in sqlexec
+logging handling rework : todo
+hash check : todo
+port support in sqlexec : todo
 code refactoring in switchover lib : done
+managing case when relay log has just been rotated : todo
+managing case when
