@@ -91,12 +91,15 @@ getslavewatermark()
         [ $# -ne 1 ] && echo "getslavewatermark function requires 1 arg : slave ip" && exit -1
 
         local slave=$1
+        local watermark
+        local endlogpos
+        
         #ALGO : lastslavegtid, xid + offset depuis le relaylog
         [[ -n "$debug" ]] && echoerr "find last relaylog file name"
         relay_log_file=$( sqlexec $slave "show slave status" | cut -f8 )
         [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog"
         read endlogpos watermark<<<$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f5,6 | xargs )
-        DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
+        local DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
         watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
         [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
@@ -146,11 +149,11 @@ switchover()
         #1   find the watermark on the slave
         [[ -n "$debug" ]] && echoerr "find watermark in relaylogfile"
 
-        watermark DDLoffset <<<$( getslavewatermark $slave )
+        read watermark DDLoffset <<<$( getslavewatermark $slave )
 
         #2   find the watermark on the new master
 
-        masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
+        local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
 
         #4 change slave settings and reconnect
         #4.1 stop slave
