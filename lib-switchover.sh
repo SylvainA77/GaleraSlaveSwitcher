@@ -53,8 +53,6 @@ exec 2>/var/log/switchover.err
 
 source /etc/.credentials
 
-debug=1
-
 echoerr()
 {
         echo "`date +%F:%T`:$@" 1>&2;
