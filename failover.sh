@@ -23,7 +23,7 @@
 exec 2>/var/log/failover.err
 
 # we need all those juicy functions don't we ?
-source /var/lib/switchover.lib
+source /var/lib/lib-switchover.sh
 source /etc/.credentials
 
 ARGS=$(getopt -o '' --long 'initiator:,children:' -- "$@")
