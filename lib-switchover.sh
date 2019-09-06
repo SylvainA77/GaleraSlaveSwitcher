@@ -51,7 +51,7 @@
 
 exec 2>/var/log/switchover.err
 
-source ./.credentials
+source /etc/.credentials
 
 debug=1
 
