@@ -54,7 +54,7 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
-for child in `${children[@]}`
+for child in "${childrens[@]}"
 do
         thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
         $thischlid
@@ -69,7 +69,7 @@ masterterip=$( findnewmaster $initiator )
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
-for child in `${children[@]}`
+for child in "${childrens[@]}"
 do
         # format of $child is still [IP]:port
         # so we have to extract the ip using both brackets as separators
