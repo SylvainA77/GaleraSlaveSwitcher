@@ -14,10 +14,10 @@
 ###
 # this bash script is intended to be triggered by maxscale event API
 # hence only 2 args are exepected : failed master ip --initiator=$INITIATOR
-# and list of slaves to switchover --children=$CHILDREN$
+# and list of slaves to switchover --children=$CHILDREN
+#TODO : add optional --target=$NEWMASTERIP parameter for manual triggering w/out maxscale
 ###
-# logs are sent to /var/log/failover.log
-# stderr is sent to failover.err
+# stderr & logs are sent to /var/log/failover.err
 
 
 exec 2>/var/log/failover.err
