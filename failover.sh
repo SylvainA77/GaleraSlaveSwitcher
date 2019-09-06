@@ -65,8 +65,8 @@ do
 done
 
 #2   find the new master
-masterterip=$( findnewmaster $initiator )
-[[ -n "$debug" ]] && echoer "newmasterip:$newmasterip"
+masterip=$( findnewmaster $initiator )
+[[ -n "$debug" ]] && echoerr "newmasterip:$masterip"
 
 #3   perform the switchover on every oprhaned child
 
