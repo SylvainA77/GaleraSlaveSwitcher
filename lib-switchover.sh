@@ -97,8 +97,9 @@ getslavewatermark()
         #ALGO : lastslavegtid, xid + offset depuis le relaylog
         [[ -n "$debug" ]] && echoerr "find last relaylog file name"
         relay_log_file=$( sqlexec $slave "show slave status" | cut -f8 )
-        [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog"
+        [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog file :relay_log_file"
         read endlogpos watermark<<<$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f5,6 | xargs )
+        [ -n "$debug" ]] && echoerr "endlogpos:$endlogpos, watermark:$watermark"
         local DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
         watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
@@ -111,7 +112,7 @@ getmasterGTIDfromwatermark()
 {
 
         [[ -n "$debug" ]] && echoerr "getmasterGTIDfromwatermark args : $*"
-        [ $# -ne 3 ] && echo "getimasterGTIFfromwatermark function requires 3 args : master ip, watermark ert DDLoffset " && exit -1
+        [ $# -ne 3 ] && echoerr "getimasterGTIDfromwatermark function requires 3 args : master ip, watermark ert DDLoffset " && exit -1
         local master=$1
         local watermark=$2
         local offset=$3
