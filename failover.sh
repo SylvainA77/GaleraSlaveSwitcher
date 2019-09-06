@@ -22,6 +22,8 @@
 
 exec 2>/var/log/failover.err
 
+debug=1
+
 # we need all those juicy functions don't we ?
 source /var/lib/lib-switchover.sh
 source /etc/.credentials
@@ -56,13 +58,15 @@ done
 IFS=',' read -ra childrens <<< "$children"
 for child in "${childrens[@]}"
 do
-        thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
-        $thischlid
-        sqlexec $thishcild "stop slave"
+        [[ -n "$debug" ]] && echoerr "child:$child"
+        thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
+        sqlexec $thischild "stop slave"
+        [[ -n "$debug" ]] && echoerr "sqlexec $thischild stop slave $?"
 done
 
 #2   find the new master
 masterterip=$( findnewmaster $initiator )
+[[ -n "$debug" ]] && echoer "newmasterip:$newmasterip"
 
 #3   perform the switchover on every oprhaned child
 
@@ -73,8 +77,9 @@ for child in "${childrens[@]}"
 do
         # format of $child is still [IP]:port
         # so we have to extract the ip using both brackets as separators
-        thischild=$( echo $child | cut -d'[' -f2 | cut 'd']' -f1 )
+        thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
         switchover $thischild $masterip
+        [[ -n "$debug" ]] && echoerr "switchover $thischild $masterip $?"
 done
 
 exit $?
