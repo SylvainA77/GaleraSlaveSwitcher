@@ -73,7 +73,7 @@ password=monitor
 monitor_interval=500
 # that's where everything happens. upon master down detection, the script is triggered with the necessary parameters
 events=master_down
-script=/var/lib/failover.sh --initiator=$INITIATOR --children=$CHILDREN
+script=/var/lib/failover.sh --initiator=$INITIATOR --children=$CHILDREN --monitor=replication-monitor
 
 # Service definitions
 #
