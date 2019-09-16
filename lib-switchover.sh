@@ -125,14 +125,14 @@ getmasterGTIDfromwatermark()
         newmasterbinlogfiles=( $( sqlexec $master 'show binary logs' | cut -f1 | tac ) )
         [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles : ${newmasterbinlogfiles[@]}"
         [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles number : ${#newmasterbinlogfiles[@]}"
-        [[ -n "$debug" ]] && echoerr "parse each binlog file until watermakr "
+        [[ -n "$debug" ]] && echoerr "parse each binlog file until watermark "
 
         for eachbinlogfile in "${newmasterbinlogfiles[@]}"
         do
                 [[ -n "$debug" ]] && echoerr "eachbinlogfile :$eachbinlogfile"
                 # we search for watermark in actual binlogfile
 
-                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | tail -1 | cut -f6 | cut -d' ' -f2 )
+                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | head -1 | cut -f6 | cut -d' ' -f3 )
                 [[ -n "$debug" ]] && echoerr "masterGTID : $masterGTID"
 
                 [[ ! -z "$masterGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
