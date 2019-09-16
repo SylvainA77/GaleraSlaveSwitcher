@@ -107,7 +107,7 @@ getslavewatermark()
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
         [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
 
-        echo "$watermark\t$DDLoffset"
+        echo "$watermark \t $DDLoffset"
 }
 
 getmasterGTIDfromwatermark()
