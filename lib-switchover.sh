@@ -31,7 +31,8 @@
 #
 # findnewmaster
 # desc : given a slave ip, finds a suitable new mlaster among the synced node of the galera cluster
-# args : 1. slave host/ip
+# args : 1. failedmaster host/ip
+#        2. initating maxscale monitor
 #
 # waitforslave
 # desc : given credentials, connect to the machine and wait until slave is up to date (as in : read binlogs = exec binlogs)
@@ -180,19 +181,19 @@ return $retcode
 findnewmaster()
 {
         [[ -n "$debug" ]] && echoerr "findnewmaster args : $*"
-        [ $# -ne 1 ] && echoerr "findnewmaster function requires 1 arg : slave ip " && exit -4
+        [ $# -ne 2 ] && echoerr "findnewmaster function requires 2 args : failed master ip & initiating maxscale monitor " && exit -4
 
         [[ -n "$debug" ]] && echoerr "find galera monitor of failed master"
 
         #1.2 find which galeramonitor master was part of
-        monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address  -e ^State -e ^Monitors | grep -C2 $1 | grep -A1 Synced  | tail -1 | cut -f2 | xargs )
+        monitor=$( maxctrl --tsv show servers | grep -e ^Server -e ^Address -e ^Monitors | grep -A1 $1 | grep -e^Monitors | grep -v $2 | cut -f2  )
         [[ -n "$debug" ]] && echoerr "monitor : $monitor "
 
         [[ -n "$debug" ]] && echoerr "find 1st synced member of same monitor group"
 
         #1.3 find on other synced node in the same monitor
 
-        local myresult=$( maxctrl --tsv show servers | grep -e ^Address  -e ^State -e ^Monitors | grep -B3 "$monitor" | grep -B1 Synced | head -1 |cut -f2 | xargs )
+        local myresult=$( maxctrl --tsv show servers | grep -e ^Address  -e ^State -e ^Monitors | grep -B3 "$monitor" | grep -B1 Synced | head -1 | cut -f2 | xargs )
         [[ -n "$debug" ]] && echoerr "newmasteraddress : $myresult"
 
         echo "$myresult"
