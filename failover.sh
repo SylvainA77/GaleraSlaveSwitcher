@@ -28,7 +28,7 @@ debug=1
 source /var/lib/lib-switchover.sh
 source /etc/.credentials
 
-ARGS=$(getopt -o '' --long 'initiator:,children:' -- "$@")
+ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:' -- "$@")
 
 eval set -- "$ARGS"
 
@@ -42,6 +42,11 @@ while true; do
         --children)
             shift;
             children=$1
+            shift;
+        ;;
+        --monitor)
+            shift;
+            monitor=$1
             shift;
         ;;
         --)
@@ -66,7 +71,7 @@ done
 
 #2   find the new master
 failedmaster=$( echo $initiator | cut -d'[' -f2 | cut -d']' -f1 )
-masterip=$( findnewmaster $failedmaster )
+masterip=$( findnewmaster $failedmaster $monitor )
 [[ -n "$debug" ]] && echoerr "newmasterip:$masterip"
 
 #3   perform the switchover on every oprhaned child
