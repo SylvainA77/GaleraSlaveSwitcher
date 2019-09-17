@@ -24,11 +24,15 @@ exec 2>/var/log/failover.err
 
 debug=1
 
+[ $debug ] && echo "DEBUG MODE ENABLED" 
+
 # we need all those juicy functions don't we ?
 source /var/lib/lib-switchover.sh
 source /etc/.credentials
 
 ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:' -- "$@")
+
+[ $debug ] && echo "DEBUG : ARGS : $ARGS" 
 
 eval set -- "$ARGS"
 
@@ -61,6 +65,9 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+
+[ $debug ] && echo "DEBUG : IFS 1 : $IFS " 
+
 for child in "${childrens[@]}"
 do
         [[ -n "$debug" ]] && echoerr "child:$child"
@@ -73,12 +80,15 @@ done
 failedmaster=$( echo $initiator | cut -d'[' -f2 | cut -d']' -f1 )
 masterip=$( findnewmaster $failedmaster $monitor )
 [[ -n "$debug" ]] && echoerr "newmasterip:$masterip"
+[ $debug ] && echo "DEBUG : Find new master : failedmaster : $failedmaster " 
+[ $debug ] && echo "DEBUG : Find new master : masterip : $masterip  " 
 
 #3   perform the switchover on every oprhaned child
 
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+[ $debug ] && echo "DEBUG : IFS 2 : $IFS " 
 for child in "${childrens[@]}"
 do
         # format of $child is still [IP]:port
@@ -87,5 +97,7 @@ do
         switchover $thischild $masterip
         [[ -n "$debug" ]] && echoerr "switchover $thischild $masterip $?"
 done
+
+[ $debug ] && echo "DEBUG : End of file failover.sh " 
 
 exit $?
