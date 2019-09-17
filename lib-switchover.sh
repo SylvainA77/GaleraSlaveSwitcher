@@ -54,6 +54,17 @@ exec 2>/var/log/switchover.err
 
 source /etc/.credentials
 
+# create debug environment 
+debug=1
+[ $debug ] && { \
+        DEBUG_FILE="/var/log/maxscale/debug.log"
+        echo "DEBUG MODE ENABLED" 
+        [ -f ${DEBUG_FILE} ] || \
+                touch ${DEBUG_FILE} || \
+                echoerr "ERROR : unable to create ${DEBUG_FILE}"
+}
+
+
 echoerr()
 {
         echo "`date +%F:%T`:$@" 1>&2;
@@ -66,6 +77,7 @@ sqlexec()
 
        local credentials=$( getcredentials $1 )
        [[ -n "$debug" ]] && echoerr "credentials : $credentials"
+       [[ -n "$debug" ]] && echoerr "request : mysql $2"
        echo "$2" | mysql -B --skip_column_names $credentials
        [ $? -ne 0 ] && exit $?
 }
@@ -131,13 +143,22 @@ getmasterGTIDfromwatermark()
         do
                 [[ -n "$debug" ]] && echoerr "eachbinlogfile :$eachbinlogfile"
                 # we search for watermark in actual binlogfile
-
-                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | head -1 | cut -f6 | cut -d' ' -f3 )
+		######## The problem is here with an a random behavior on each run 
+		######## Maybe test the stuf priovided by ricky 
+                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | head -2 | tail -1 | cut -f6 | cut -d' ' -f3 )
+                [[ -n "$debug" ]] && echoerr "DEBUG sqlexec $master show binlog events in $eachbinlogfile | grep -i -e xid -e gtid  | grep -A$offset -e $watermark  | head -1 | tail -1 | cut -f6 | cut -d -f3 )"
                 [[ -n "$debug" ]] && echoerr "masterGTID : $masterGTID"
+		#######
+		[[ -n "$debug" ]] && { \
+		#	masterSEBGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | fgrep "Xid = $watermark" | tr -s " " | cut -d " " -f 7)
+			masterSEBGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep -A3 $watermark  | head -2 | cut -f6 | cut -d ' ' -f3)
+			echoerr "masterSEBGTID : $masterSEBGTID"		
+		}
 
-                [[ ! -z "$masterGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
+                [[ ! -z "$masterGTID" ]] && break ; # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
         done
 
+        echo "DEBUG $masterGTID"
         echo "$masterGTID"
 }
 
@@ -156,7 +177,12 @@ switchover()
 
         #2   find the watermark on the new master
 
-        local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
+        local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset ) 
+	# SEB was returning xid=xxxxxxx
+	#  - fix using sed ;) 
+        #local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset | sed 's/xid=//' )
+
+	[ $debug ] && echo "DEBUG : masterGTIDfromWatermark : $masterGTID , $(getmasterGTIDfromwatermark $master $watermark $DDLoffset)" >> ${DEBUG_FILE}
 
         #4 change slave settings and reconnect
         #4.1 stop slave
@@ -165,15 +191,15 @@ switchover()
 
         #4.2 change slave gtid
         [[ -n "$debug" ]] && echoerr "set gtid to $masterGTID"
-        sqlexec $slave "set global gtid_slave_pos=$masterGTID"
+        sqlexec $slave "set global gtid_slave_pos=\"$masterGTID\""
 
         #4.3 change master shot
         [[ -n "$debug" ]] && echoerr "change master"
-        sqlexec $slave 'change master to master_host=$newmasterip, master_use_gtid=slave_pos'
+        sqlexec $slave "change master to master_host=$newmasterip, master_use_gtid=$slave_pos"
 
         #4.4 start slave
         [[ -n "$debug" ]] && echoerr "start slave"
-        sqlexec $slave 'start slave'
+        sqlexec $slave "start slave"
 
 return $retcode
 }
