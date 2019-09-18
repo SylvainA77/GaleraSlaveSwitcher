@@ -41,6 +41,8 @@ source /etc/.credentials
 
 ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:' -- "$@")
 
+[ $debug ] && echo "DEBUG : ARGS : $ARGS" >> ${DEBUG_FILE}
+
 eval set -- "$ARGS"
 
 while true; do
@@ -77,6 +79,8 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+[ $debug ] && echo "DEBUG : IFS 1 : $IFS " >> ${DEBUG_FILE} 
+
 for child in "${childrens[@]}"
 do
         [[ -n "$debug" ]] && echoerr "child:$child"
@@ -101,13 +105,16 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+[ $debug ] && echo "DEBUG : IFS 2 : $IFS "  >> ${DEBUG_FILE}
 for child in "${childrens[@]}"
 do
-        # format of $child is still [IP]:port
-        # so we have to extract the ip using both brackets as separators
-        thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
-        switchover $thischild $masterip
+	# format of $child is still [IP]:port
+	# so we have to extract the ip using both brackets as separators
+	thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
+	switchover $thischild $masterip
         [[ -n "$debug" ]] && echoerr "switchover $thischild $masterip $?"
 done
+
+[ $debug ] && echo "DEBUG : End of file failover.sh "  >> ${DEBUG_FILE}
 
 exit $?
