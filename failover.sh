@@ -27,7 +27,7 @@ source /var/lib/lib-switchover.sh
 source /etc/.credentials
 
 # create debug environment 
-debug=1
+debug=0
 [ $debug ] && { \
 	DEBUG_FILE="/var/log/maxscale/debug.log"
 	echo "DEBUG MODE ENABLED" 

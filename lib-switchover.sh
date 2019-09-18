@@ -55,7 +55,7 @@ exec 2>/var/log/switchover.err
 source /etc/.credentials
 
 # create debug environment 
-debug=1
+debug=0
 [ $debug ] && { \
         DEBUG_FILE="/var/log/maxscale/debug.log"
         echo "DEBUG MODE ENABLED" 
@@ -167,7 +167,7 @@ switchover()
         read watermark DDLoffset <<<$( getslavewatermark $slave )
 
         #2   find the watermark on the new master
-        local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset ) 
+        local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
 
         #4 change slave settings and reconnect
         #4.1 stop slave
