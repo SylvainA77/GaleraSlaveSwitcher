@@ -38,6 +38,10 @@
 # desc : given credentials, connect to the machine and wait until slave is up to date (as in : read binlogs = exec binlogs)
 # args : 1. slave host/ip
 #
+# getxid
+# desc : given credentials, get watermark and DDLoffset
+# args : 1. binlogdir
+#
 # getslavewatermark
 # desc : given credentials, connect to the machine, get watermark and DDLoffset
 # args : 1. slave host/ip
@@ -116,6 +120,32 @@ getslavewatermark()
         [[ -n "$debug" ]] && echoerr "endlogpos:$endlogpos, watermark:$watermark"
         DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
         watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
+        [[ -n "$debug" ]] && echoerr "watermark : $watermark"
+        [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
+
+        echo "$watermark        $DDLoffset"
+}
+
+getxid()
+{
+
+        [[ -n "$debug" ]] && echoerr "getslavwatermark args : $*"
+        [ $# -ne 1 ] && echo "getslavewatermark function requires 1 arg : binlogdir" && exit -1
+
+        local binlogdir=$1
+        local watermark
+        local endlogpos
+        local DDLoffset
+        
+        #ALGO : lastslavegtid, xid + offset depuis le relaylog
+        [[ -n "$debug" ]] && echoerr "find last binlog file name"
+        binlogfile=$( ls -ltr $binlogdir | tail -1 | cut [reste a cut et prendre la colonne qui nous interesse) )
+        [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog file :$binlogfile"
+#obsolete        
+#        read endlogpos watermark<<<$( mysqlbinlog $binlogdir/$binlogfile | grep -i xid | tail -1 | cut -f2,6 | xargs )
+#        [[ -n "$debug" ]] && echoerr "endlogpos:$endlogpos, watermark:$watermark"
+#        DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
+#        watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
         [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
 
