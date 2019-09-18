@@ -33,11 +33,20 @@ set +x
 
 exec 2>/var/log/failover.err
 
-debug=1
-
 # we need all those juicy functions, don't we ?
 source /var/lib/lib-switchover.sh
 source /etc/.credentials
+
+# create debug environment 
+debug=0
+[ $debug ] && { \
+	DEBUG_FILE="/var/log/maxscale/debug.log"
+	echo "DEBUG MODE ENABLED" 
+	[ -f ${DEBUG_FILE} ] || \
+		touch ${DEBUG_FILE} || \
+		echoerr "ERROR : unable to create ${DEBUG_FILE}"
+}
+
 
 ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:' -- "$@")
 
@@ -86,6 +95,8 @@ do
 done
 
 #2   find the new master
+[ $debug ] && echo "DEBUG : Find new master : failedmaster : $failedmaster "  >> ${DEBUG_FILE}
+[ $debug ] && echo "DEBUG : Find new master : masterip : $masterip  "  >> ${DEBUG_FILE}
 #2.1 if --target, then bypass maxscale
 [[ -n "$target" ]] && masterip=$( echo $target | cut -d'[' -f2 | cut -d']' -f1 )
 [[ -n "$debug" ]] && echoerr "target:$target"
@@ -101,6 +112,7 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+[ $debug ] && echo "DEBUG : IFS 2 : $IFS "  >> ${DEBUG_FILE}
 for child in "${childrens[@]}"
 do
         # format of $child is still [IP]:port
@@ -109,5 +121,7 @@ do
         switchover $thischild $masterip
         [[ -n "$debug" ]] && echoerr "switchover $thischild $masterip $?"
 done
+
+[ $debug ] && echo "DEBUG : End of file failover.sh "  >> ${DEBUG_FILE}
 
 exit $?

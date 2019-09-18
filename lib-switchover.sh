@@ -54,6 +54,17 @@ exec 2>/var/log/switchover.err
 
 source /etc/.credentials
 
+# create debug environment 
+debug=0
+[ $debug ] && { \
+        DEBUG_FILE="/var/log/maxscale/debug.log"
+        echo "DEBUG MODE ENABLED" 
+        [ -f ${DEBUG_FILE} ] || \
+                touch ${DEBUG_FILE} || \
+                echoerr "ERROR : unable to create ${DEBUG_FILE}"
+}
+
+
 echoerr()
 {
         echo "`date +%F:%T`:$@" 1>&2;
@@ -66,6 +77,7 @@ sqlexec()
 
        local credentials=$( getcredentials $1 )
        [[ -n "$debug" ]] && echoerr "credentials : $credentials"
+       [[ -n "$debug" ]] && echoerr "request : mysql $2"
        echo "$2" | mysql -B --skip_column_names $credentials
        [ $? -ne 0 ] && exit $?
 }
@@ -131,11 +143,11 @@ getmasterGTIDfromwatermark()
         do
                 [[ -n "$debug" ]] && echoerr "eachbinlogfile :$eachbinlogfile"
                 # we search for watermark in actual binlogfile
-
-                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | head -1 | cut -f6 | cut -d' ' -f3 )
+                masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -B1 -e "$watermark"  | grep -i gtid | tail -1 | cut -f6 | sed 's/GTID //' | sed 's/BEGIN //' )
+                [[ -n "$debug" ]] && echoerr "DEBUG sqlexec $master show binlog events in $eachbinlogfile | grep -i -e xid -e gtid  | grep -A$offset -B1 -e $watermark  | grep -i gtid | tail -1 | cut -f6 | cut -d -f3 )"
                 [[ -n "$debug" ]] && echoerr "masterGTID : $masterGTID"
 
-                [[ ! -z "$masterGTID" ]] && break # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
+                [[ ! -z "$masterGTID" ]] && break ; # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
         done
 
         echo "$masterGTID"
@@ -145,7 +157,7 @@ switchover()
 {
 
         [[ -n "$debug" ]] && echoerr "switchover args : $*"
-        [ $# -ne 2 ] && echo "Switchover function requires 2 args : 1. slave ip, 2. new master ip" && exit -1
+        [ $# -ne 2 ] && echoerr "Switchover function requires 2 args : 1. slave ip, 2. new master ip" && exit -1
         local slave=$1
         local master=$2
 
@@ -155,7 +167,6 @@ switchover()
         read watermark DDLoffset <<<$( getslavewatermark $slave )
 
         #2   find the watermark on the new master
-
         local masterGTID=$( getmasterGTIDfromwatermark $master $watermark $DDLoffset )
 
         #4 change slave settings and reconnect
@@ -165,15 +176,15 @@ switchover()
 
         #4.2 change slave gtid
         [[ -n "$debug" ]] && echoerr "set gtid to $masterGTID"
-        sqlexec $slave "set global gtid_slave_pos=$masterGTID"
+        sqlexec $slave "set global gtid_slave_pos=\"$masterGTID\""
 
         #4.3 change master shot
         [[ -n "$debug" ]] && echoerr "change master"
-        sqlexec $slave 'change master to master_host=$newmasterip, master_use_gtid=slave_pos'
+        sqlexec $slave "change master to master_host=\"$master\", master_use_gtid=slave_pos"
 
         #4.4 start slave
         [[ -n "$debug" ]] && echoerr "start slave"
-        sqlexec $slave 'start slave'
+        sqlexec $slave "start slave"
 
 return $retcode
 }
