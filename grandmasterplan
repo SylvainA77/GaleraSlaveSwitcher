@@ -1,0 +1,12 @@
+main idea : use maxscale binlogrouter to store galera node binlog infos. this way we preserve xid whatever states master and slaves are in.
+
+need : binlogrouterconnected to same master as monitored slave. we can even chain the slaves to the binlogrouter if need be.
+
+howto : detect server down events in galeramon or master_down event in mariadbmon and launch script.
+
+algo :
+  1. find new master  ( lib-switchover:findnewmaster func or give it as param )
+  2. read last commit from last binlog file, get xid from it. count how many gtid w/ commit events after xid => offset (DDL statements). ( lib-switchover:getxid func )
+  3. find xid in new master binlog, go down "offset" event, fetch GTID (lib-switchover:getmasterGTIDfromwatermark func )
+  
+todo : write new func getxid , just replace "show binlog events in" by mysqlbinlog in getwatermark 
