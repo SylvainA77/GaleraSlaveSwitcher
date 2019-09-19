@@ -13,6 +13,8 @@
 # original code & doc by Sylvain Arbaudie
 # github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
 ###
+# main contributor : Sebastien Giraud
+#                    sebastien.giraud@mariadb.com
 # functions description
 #
 # echoerr
