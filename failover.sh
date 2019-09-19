@@ -12,6 +12,9 @@
 # original code & doc by Sylvain Arbaudie
 # github repo : https://github.com/SylvainA77/GaleraSlaveSwitcher
 ###
+# main contributor : Sebastien Giraud
+#		     sebastien.giraud@mariadb.com
+###
 # this bash script is intended to be triggered by maxscale event API
 # up to 4 args are expected : failed master ip --initiator=$INITIATOR
 #                               format of $initiator is : [IP]:port
