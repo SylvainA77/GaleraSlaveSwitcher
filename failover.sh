@@ -53,6 +53,8 @@ debug=0
 
 ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:' -- "$@")
 
+[ $debug ] && echo "DEBUG : ARGS : $ARGS" >> ${DEBUG_FILE}
+
 eval set -- "$ARGS"
 
 while true; do
@@ -89,6 +91,8 @@ done
 # format of $children is : [IP]:port,[IP]:port,*
 # so we have to break the string into an array of strings using , as a separator
 IFS=',' read -ra childrens <<< "$children"
+[ $debug ] && echo "DEBUG : IFS 1 : $IFS " >> ${DEBUG_FILE} 
+
 for child in "${childrens[@]}"
 do
         [[ -n "$debug" ]] && echoerr "child:$child"
