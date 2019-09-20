@@ -51,7 +51,7 @@ debug=0
 }
 
 
-ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:' -- "$@")
+ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:,usebinlogrouter:' -- "$@")
 
 [ $debug ] && echo "DEBUG : ARGS : $ARGS" >> ${DEBUG_FILE}
 
@@ -79,6 +79,11 @@ while true; do
             target=$1
             shift;
         ;;
+        --usebinlogrouter)
+            shift;
+            usebinlogrouter=$1
+            shift;
+        ;;
         --)
             shift;
             break;
@@ -97,7 +102,7 @@ for child in "${childrens[@]}"
 do
         [[ -n "$debug" ]] && echoerr "child:$child"
         thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
-        sqlexec $thischild "stop slave"
+        sqlexec $thischild "stop slave" "$usebinlogrouter"
         [[ -n "$debug" ]] && echoerr "sqlexec $thischild stop slave $?"
 done
 
@@ -125,8 +130,8 @@ do
         # format of $child is still [IP]:port
         # so we have to extract the ip using both brackets as separators
         thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
-        switchover $thischild $masterip
-        [[ -n "$debug" ]] && echoerr "switchover $thischild $masterip $?"
+        switchover $thischild $masterip $usebinlogrouter
+        [[ -n "$debug" ]] && echoerr "switchover $thischild , $masterip , $usebinlogrouter,  $?"
 done
 
 [ $debug ] && echo "DEBUG : End of file failover.sh "  >> ${DEBUG_FILE}

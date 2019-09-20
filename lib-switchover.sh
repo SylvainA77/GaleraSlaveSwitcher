@@ -79,12 +79,23 @@ echoerr()
 sqlexec()
 {
        [[ -n "$debug" ]] && echoerr "sqlexec args : $*"
-       [ $# -ne 2 ] && echo "sqlexec function requires 2 args : ip, statement " && exit -1
-
+       #[ $# -ne 2 ] && echo "sqlexec function requires 2/3 args : ip, statement, [port] " && exit -1
+#TODO
        local credentials=$( getcredentials $1 )
+       local port=3306
+       [[ $# -ge 4 ]] && port=$4
+       [[ $# -eq 6 ]] && credentials="-u$5 -p$6 -h$1"
+
+       [[ "$3" -eq 1 ]] && local binlogrouterservice=$( maxctrl --tsv list services | grep binlogrouter |cut -f1 )
+       [[ "$3" -eq 1 ]] && local binlogrouter_user=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f2 | sed 's/.*=//' )	
+       [[ "$3" -eq 1 ]] && local binlogrouter_pass=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f3 | sed 's/.*=//' )	
+       [[ "$3" -eq 1 ]] && local port=$( maxctrl list listeners ${binlogrouterservice} --tsv | cut -f2 )
+       [[ "$3" -eq 1 ]] && credentials="-u$binlogrouter_user -p$binlogrouter_pass -h$1"
+
        [[ -n "$debug" ]] && echoerr "credentials : $credentials"
        [[ -n "$debug" ]] && echoerr "request : mysql $2"
-       echo "$2" | mysql -B --skip_column_names $credentials
+       [[ -n "$debug" ]] && echoerr "port : $port"
+       echo "$2" | mysql -B --skip_column_names $credentials -P$port
        [ $? -ne 0 ] && exit $?
 }
 
@@ -98,7 +109,7 @@ waitforslave()
 
         while [ $readlogpos -ne $execlogpos ]
         do
-                read readlogpos execlogpos <<<$( sqlexec $slave "show slave status" | cut -f7,22 )
+                read readlogpos execlogpos <<<$( sqlexec $slave "show slave status" $usebinlogrouter | cut -f7,22 )
                 [[ -n "$debug" ]] && echoerr "readlogpos : $readlogpos / execlogpos : $execlogpos "
         done
 }
@@ -116,11 +127,11 @@ getslavewatermark()
         
         #ALGO : lastslavegtid, xid + offset depuis le relaylog
         [[ -n "$debug" ]] && echoerr "find last relaylog file name"
-        relay_log_file=$( sqlexec $slave "show slave status" | cut -f8 )
+        relay_log_file=$( sqlexec $slave "show slave status" 0 | cut -f8 )
         [[ -n "$debug" ]] && echoerr "find xid + offset from relaylog file :$relay_log_file"
-        read endlogpos watermark<<<$( sqlexec $slave "show relaylog events in '$relay_log_file'" | grep -i xid | tail -1 | cut -f2,6 | xargs )
+        read endlogpos watermark<<<$( sqlexec $slave "show relaylog events in '$relay_log_file'" 0 | grep -i xid | tail -1 | cut -f2,6 | xargs )
         [[ -n "$debug" ]] && echoerr "endlogpos:$endlogpos, watermark:$watermark"
-        DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" | grep -i gtid | wc -l)
+        DDLoffset=$( sqlexec $slave "show relaylog events in '$relay_log_file' from $endlogpos" 0 | grep -i gtid | wc -l)
         watermark=$(echo "$watermark" | cut -d'*' -f2 | cut -d'=' -f2 )
         [[ -n "$debug" ]] && echoerr "watermark : $watermark"
         [[ -n "$debug" ]] && echoerr "DDLoffset : $DDLoffset"
@@ -141,7 +152,7 @@ getxid()
 	local binlogfile=$( maxctrl show service ${binlogrouterservice} | grep binlog_name | cut -d '"' -f4 )
 	local binlogdir=$( maxctrl show service ${binlogrouterservice} |grep router_option | sed 's/,/\n/g' | grep binlogdir | cut -d= -f2 )
 
-	read endlogpos watermark <<<$( mysqlbinlog ${binlogdir}/${binlogfile} --base64-output=decode-rows | grep -e Xid --binary-files=text | tail -1 | cut -d ' ' -f8,13 )
+	read endlogpos watermark <<<$( mysqlbinlog ${binlogdir}/${binlogfile} --base64-output=decode-rows | grep -e Xid --binary-files=text | tail -1 | cut -d ' ' -f8,13 )
 	DDLoffset=$( mysqlbinlog ${binlogdir}/${binlogfile} --base64-output=decode-rows -j ${endlogpos} | grep -e GTID | wc -l )
 
 	#local binlogfile=$( mysql -P5308 -h127.0.0.1 -umaxscale -pM4xscale_pw -e 'show slave status\G' | grep "^[[:space:]]*Master_Log_File:" | sed 's/ //g' | cut -d: -f2 )
@@ -175,7 +186,7 @@ getreplcoordinates()
 
         [[ -n "$debug" ]] && echoerr "find list of binlog files (reverseorder) on new master"
 
-        newmasterbinlogfiles=( $( sqlexec $master 'show binary logs' | cut -f1 | tac ) )
+        newmasterbinlogfiles=( $( sqlexec $master 'show binary logs' 0 | cut -f1 | tac ) )
         [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles : ${newmasterbinlogfiles[@]}"
         [[ -n "$debug" ]] && echoerr "newmasterbinlogfiles number : ${#newmasterbinlogfiles[@]}"
         [[ -n "$debug" ]] && echoerr "parse each binlog file until watermark "
@@ -185,8 +196,8 @@ getreplcoordinates()
                 [[ -n "$debug" ]] && echoerr "eachbinlogfile :$eachbinlogfile"
                 # we search for watermark in actual binlogfile
                 #masterGTID=$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -B1 -e "$watermark"  | grep -i gtid | tail -1 | cut -f6 | sed 's/GTID //' | sed 's/BEGIN //' )
-                read binlogfile startpos masterGTID <<<$( sqlexec $master "show binlog events in '$eachbinlogfile'" | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | grep -i gtid | cut -f 1,2,6 |sed 's/BEGIN GTID //' )
-                [[ -n "$debug" ]] && echoerr "DEBUG sqlexec $master show binlog events in $eachbinlogfile | grep -i -e xid -e gtid  | grep -A$offset  -e $watermark  | grep -i gtid | cut -f 2,6 |sed 's/BEGIN GTID //'  )"
+                read binlogfile startpos masterGTID <<<$( sqlexec $master "show binlog events in '$eachbinlogfile'" 0 | grep -i -e xid -e gtid  | grep "-A$offset" -e "$watermark"  | grep -i gtid | cut -f 1,2,6 |sed 's/BEGIN GTID //' | sed 's/GTID //' )
+                [[ -n "$debug" ]] && echoerr "DEBUG sqlexec $master show binlog events in $eachbinlogfile 0 | grep -i -e xid -e gtid  | grep -A$offset  -e $watermark  | grep -i gtid | cut -f 2,6 |sed 's/BEGIN GTID //'  )"
                 [[ -n "$debug" ]] && echoerr "masterGTID : $masterGTID, startpos : $startpos"
 
                 [[ ! -z "$masterGTID" ]] && break ; # as long as watermark is not matched, waterarkGTID stays unset/empty. Once watermarkGTID is set, we have found what we need and can exit the loop
@@ -202,11 +213,12 @@ switchover()
         [ $# -ne 3 ] && echoerr "Switchover function requires 3 args : 1. slave ip, 2. new master ip, 3. usebinlogrouter" && exit -1
         local slave=$1
         local master=$2
-	local usebinlogrouter=$3
+	usebinlogrouter=$3
 
-	local binlogrouterservice=$( maxctrl --tsv list services | grep binlogrouter |cut -f1 )
-	local binlogrouter_user=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f2 | sed 's/.*=//' )	
-	local binlogrouter_pass=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f3 | sed 's/.*=//' )	
+	##[[ -n "$usebinlogrouter" ]] && local binlogrouterservice=$( maxctrl --tsv list services | grep binlogrouter |cut -f1 )
+	##[[ -n "$usebinlogrouter" ]] && local binlogrouter_user=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f2 | sed 's/.*=//' )	
+	##[[ -n "$usebinlogrouter" ]] && local binlogrouter_pass=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f3 | sed 's/.*=//' )	
+	##[[ -n "$usebinlogrouter" ]] && local port=$( maxctrl list listeners ${binlogrouterservice} --tsv | cut -f2 )
 
 	local startpos=''
 	local binlogfile=''
@@ -230,18 +242,16 @@ switchover()
 
         #4.2 change slave gtid
         [[ -n "$debug" ]] && echoerr "set gtid to $masterGTID"
-        [[ -n "$usebinlogrouter" ]] && sqlexec '127.0.0.1' "set @@global.gtid_slave_pos=\"$masterGTID\""
-        [[ -n "$usebinlogrouter" ]] || sqlexec $slave "set global gtid_slave_pos=\"$masterGTID\""
+        [[ -n "$usebinlogrouter" ]] && sqlexec '127.0.0.1' "set @@global.gtid_slave_pos=\"$masterGTID\"" $usebinlogrouter
+        [[ -n "$usebinlogrouter" ]] || sqlexec $slave "set global gtid_slave_pos=\"$masterGTID\"" 0
 
 	#4.3 change master shot
         [[ -n "$debug" ]] && echoerr "change master"
-        [[ -n "$usebinlogrouter" ]] && sqlexec '127.0.0.1' "change master to master_host=\"$master\", master_use_gtid=slave_pos"
-        [[ -n "$usebinlogrouter" ]] || sqlexec $slave "change master to master_host=\"$master\", master_use_gtid=slave_pos"
+         sqlexec $slave "change master to master_host=\"$master\", master_use_gtid=slave_pos" $usebinlogrouter
 
         #4.4 start slave
         [[ -n "$debug" ]] && echoerr "start slave"
-        [[ -n "$usebinlogrouter" ]] && sqlexec $slave "start slave"
-        [[ -n "$usebinlogrouter" ]] || sqlexec $slave "start slave"
+        sqlexec $slave "start slave" $usebinlogrouter
 
 return $retcode
 }
