@@ -41,7 +41,7 @@ source /var/lib/lib-switchover.sh
 source /etc/.credentials
 
 # create debug environment 
-debug=0
+debug=1
 [ $debug ] && { \
 	DEBUG_FILE="/var/log/maxscale/debug.log"
 	echo "DEBUG MODE ENABLED" 
@@ -102,7 +102,7 @@ for child in "${childrens[@]}"
 do
         [[ -n "$debug" ]] && echoerr "child:$child"
         thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
-        sqlexec $thischild "stop slave" "$usebinlogrouter"
+        sqlexec $thischild "stop slave" $usebinlogrouter
         [[ -n "$debug" ]] && echoerr "sqlexec $thischild stop slave $?"
 done
 
@@ -114,8 +114,8 @@ done
 [[ -n "$debug" ]] && echoerr "target:$target"
 
 #2.2 if --initiator, then call maxscale
-[[ -n $"initiator" ]] && failedmaster=$( echo $initiator | cut -d'[' -f2 | cut -d']' -f1 )
-[[ -n $"initiator" ]] && masterip=$( findnewmaster $failedmaster $monitor )
+[[ -n "$initiator" ]] && failedmaster=$( echo $initiator | cut -d'[' -f2 | cut -d']' -f1 )
+[[ -n "$initiator" ]] && masterip=$( findnewmaster $failedmaster $monitor )
 [[ -n "$debug" ]] && echoerr "initiator:$initiator"
 
 [[ -n "$debug" ]] && echoerr "masterip:$masterip"
