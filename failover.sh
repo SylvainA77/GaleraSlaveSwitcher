@@ -51,7 +51,7 @@ debug=1
 }
 
 
-ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:,usebinlogrouter:' -- "$@")
+ARGS=$(getopt -o '' --long 'initiator:,children:,monitor:,target:,usebinlogrouter:, usegtid:' -- "$@")
 
 [ $debug ] && echo "DEBUG : ARGS : $ARGS" >> ${DEBUG_FILE}
 
@@ -82,6 +82,11 @@ while true; do
         --usebinlogrouter)
             shift;
             usebinlogrouter=$1
+            shift;
+        ;;
+        --usegtid)
+            shift;
+            usegtid=$1
             shift;
         ;;
         --)
@@ -130,8 +135,8 @@ do
         # format of $child is still [IP]:port
         # so we have to extract the ip using both brackets as separators
         thischild=$( echo $child | cut -d'[' -f2 | cut -d']' -f1 )
-        switchover $thischild $masterip $usebinlogrouter
-        [[ -n "$debug" ]] && echoerr "switchover $thischild , $masterip , $usebinlogrouter,  $?"
+        switchover $thischild $masterip $usebinlogrouter $usegtid
+        [[ -n "$debug" ]] && echoerr "switchover $thischild , $masterip , $usebinlogrouter,  $usegtid, $?"
 done
 
 [ $debug ] && echo "DEBUG : End of file failover.sh "  >> ${DEBUG_FILE}
