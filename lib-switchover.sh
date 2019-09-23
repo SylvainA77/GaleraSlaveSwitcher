@@ -210,19 +210,15 @@ switchover()
 {
 
         [[ -n "$debug" ]] && echoerr "switchover args : $*"
-        [ $# -ne 3 ] && echoerr "Switchover function requires 3 args : 1. slave ip, 2. new master ip, 3. usebinlogrouter" && exit -1
+        [ $# -lt 3 ] && echoerr "Switchover function requires 3 args : 1. slave ip, 2. new master ip, 3. usebinlogrouter, 4 [optionnal : usegtid]" && exit -1
         local slave=$1
         local master=$2
 	usebinlogrouter=$3
-
-	##[[ -n "$usebinlogrouter" ]] && local binlogrouterservice=$( maxctrl --tsv list services | grep binlogrouter |cut -f1 )
-	##[[ -n "$usebinlogrouter" ]] && local binlogrouter_user=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f2 | sed 's/.*=//' )	
-	##[[ -n "$usebinlogrouter" ]] && local binlogrouter_pass=$( maxctrl show service ${binlogrouterservice} | grep router_options | cut -d, -f3 | sed 's/.*=//' )	
-	##[[ -n "$usebinlogrouter" ]] && local port=$( maxctrl list listeners ${binlogrouterservice} --tsv | cut -f2 )
-
+	local usegtid=${4:-1}
 	local startpos=''
 	local binlogfile=''
 	local masterGTID=''
+	local stmt=''
 
 	#1   find the watermark on the slave
         [[ -n "$debug" ]] && echoerr "find watermark in relaylogfile"
@@ -232,9 +228,16 @@ switchover()
 
         #2   find the watermark on the new master
         read masterGTID binlogfile startpos <<<$( getreplcoordinates $master $watermark $DDLoffset )
-#TODO add switch if using GTID 
 
-	
+	#TODO check gtid, binlog, and position and exit if this vairables are empty
+	[[ -z $masterGTID ]] || [[ -z $binlogfile ]] || [[ -z $startpos ]] && {
+		echoerr "ERROR variables not setted ! " 
+		echoerr "Master GTID : $masterGTID " 
+		echoerr "BinlogFile : $binlogfile " 
+		echoerr "StartPos : $startpos " 
+		exit 2;
+	}
+
         #4 change slave settings and reconnect
         #4.1 stop slave
         #[[ -n "$debug" ]] && echoerr "stop slave"
@@ -242,14 +245,22 @@ switchover()
 
         #4.2 change slave gtid
         [[ -n "$debug" ]] && echoerr "set gtid to $masterGTID"
-        [[ -n "$usebinlogrouter" ]] && sqlexec '127.0.0.1' "set @@global.gtid_slave_pos=\"$masterGTID\"" $usebinlogrouter
-        [[ -n "$usebinlogrouter" ]] || sqlexec $slave "set global gtid_slave_pos=\"$masterGTID\"" 0
+       
+        #[[ -n "$usebinlogrouter" ]] && stmt="set \@\@global.gtid_slave_pos=\"$masterGTID\""
+        #[[ -n "$usebinlogrouter" ]] || stmt="set global gtid_slave_pos=\"$masterGTID\"" 
+	
+	[[ -n "$usegtid" ]] && sqlexec $slave "set @@global.gtid_slave_pos=\"$masterGTID\" " $usebinlogrouter
+        [[ -n "$usegtid" ]] || sqlexec $slave "change master to master_log_file=\'$binlogfile\', master_log_post=$startpos" $usebinlogrouter
 
 	#4.3 change master shot
         [[ -n "$debug" ]] && echoerr "change master"
-         sqlexec $slave "change master to master_host=\"$master\", master_use_gtid=slave_pos" $usebinlogrouter
 
-        #4.4 start slave
+	local tmp_slave_pos=''
+	[[ -n "$usegtid" ]] && tmp_slave_pos=", master_use_gtid=slave_pos"
+
+	sqlexec $slave "change master to master_host=\"$master\" $tmp_slave_pos" $usebinlogrouter
+
+	#4.4 start slave
         [[ -n "$debug" ]] && echoerr "start slave"
         sqlexec $slave "start slave" $usebinlogrouter
 
